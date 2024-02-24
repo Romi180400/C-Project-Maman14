@@ -15,6 +15,7 @@ enum asm_dir_type{
 
 struct ast {
     char syntax_error[200];
+    char symbol[32];
     enum  {
         ast_operation,
         ast_directive,
@@ -25,7 +26,9 @@ struct ast {
             enum asm_op_type aot;
             struct {
                 enum {
-                    operand_immd,
+                    operand_none = 0,
+                    operand_immd = 0,
+                    operand_immd_symbol =0,
                     operand_symbol,
                     operand_array_index,
                     operand_register

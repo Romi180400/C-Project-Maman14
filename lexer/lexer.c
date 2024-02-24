@@ -23,7 +23,7 @@ struct asm_defintion {
 };
 /**
  * @brief
- * @param args_allow - L - label D - number R - register I - index with symbol
+ * @param args_allow - L - label D - number(this is immd both symbol and numeric) R - register I - index with symbol
  */
 static struct asm_defintion asm_table[16] = {
         {ast_mov,"mov","LDRI", "LRI"},
@@ -40,6 +40,7 @@ struct parse_args_result {
     char arg_syntax_error[100];
     enum {
         arg_immed,
+        arg_immed_symbol,
         arg_symbol,
         arg_array_index,
         arg_register,
@@ -71,6 +72,10 @@ static void parse_asm_arg(struct parse_args_result * par,int src_or_dest, struct
         case arg_immed:
             ast->ast_options.ast_op.operands[src_or_dest].operand_option = operand_immd;
             ast->ast_options.ast_op.operands[src_or_dest].operand.immd = par->result.immed;
+            break;
+        case arg_immed_symbol:
+            ast->ast_options.ast_op.operands[src_or_dest].operand_option = operand_immd_symbol;
+            ast->ast_options.ast_op.operands[src_or_dest].operand.symbol = par->result.symbol;
             break;
         case arg_array_index:
             ast->ast_options.ast_op.operands[src_or_dest].operand_option = operand_array_index;
