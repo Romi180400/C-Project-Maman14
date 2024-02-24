@@ -1,12 +1,20 @@
 #ifndef __LEX_H
 #define __LEX_H
-#define MAX_ERROR 200
-#define MAX_NUMS_OP 2
-#define MAX_DATA 90
+enum asm_op_type{
+    ast_mov,
+    ast_cmp,
+    ast_add
+};
 
+enum asm_dir_type{
+    dir_entry,
+    dir_external,
+    dir_data,
+    dir_string
+};
 
 struct ast {
-    char syntax_error[MAX_ERROR];
+    char syntax_error[200];
     enum  {
         ast_operation,
         ast_directive,
@@ -14,24 +22,7 @@ struct ast {
     }ast_type;
     union {
         struct {
-            enum {
-                ast_mov,
-                ast_cmp,
-                ast_add,
-                ast_sub,
-                ast_not,
-                ast_clr,
-                ast_lea,
-                ast_inc,
-                ast_dec,
-                ast_jmp,
-                ast_bne,
-                ast_red,
-                ast_prn,
-                ast_jsr,
-                ast_rst,
-                ast_hlt
-            }op_type;
+            enum asm_op_type aot;
             struct {
                 enum {
                     operand_immd,
@@ -44,30 +35,26 @@ struct ast {
                     int reg;
                     char * symbol;
                     struct {
-                        enum {
-                            array_index_symbol,
-                            array_index_number
-                        }index_num_or_symbol;
-                        union {
+                        struct { /* symbol AND index*/
                             char * symbol;
+                            enum {
+                                array_index_label,
+                                array_index_number
+                            }index_num_or_symbol;
                             int index;
-                        }index_num_or_symbol_union;
+                            char *label;
+                        }index_pair;
                     }array_index;
                 }operand;
-            }operands[MAX_NUMS_OP];
+            }operands[2];
         }ast_op;
         struct {
-            enum {
-                dir_entry,
-                dir_external,
-                dir_data,
-                dir_string
-            }dir_type;
+            enum asm_dir_type adt;
             union {
                 char * symbol;
                 char * string;
                 struct {
-                    int data[MAX_DATA];
+                    int data[90];
                     int array_size;
                 }data_array;
             }dir_option;
