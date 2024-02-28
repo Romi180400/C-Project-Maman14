@@ -1,9 +1,12 @@
 #include <stdio.h>
-#include "lexer.h"
+#include "lexer/lexer.h"
 #include "preproc.h"
 #include "translation_unit.h"
 #include <string.h>
 #define PROG_BASE 100
+
+
+void back_main(const struct translation_unit *tu);
 /**
  * @brief builds the program
  *

@@ -2,7 +2,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>
-
+#include <stdio.h>
 #define after_sppace(s) while(isspace(*s))s++
 /**
  * @brief
@@ -16,7 +16,7 @@ struct directive_definition  {
 };
 
 struct asm_defintion {
-    enum asm_op_type;
+    enum asm_op_type aot;
     const char * name;
     const char * args_allow_src;
     const char * args_allow_dest;
@@ -55,7 +55,7 @@ struct parse_args_result {
             char * symbol;
             int index_num_or_symbol;
             int index;
-            char * symbol;
+            char * index_symbol;
         }array_index;
     }result;
 };
@@ -100,7 +100,7 @@ static void parse_asm_args(char *args_string,struct asm_defintion *asm_def,struc
     char * separator;
     char *src, *dest;
     after_sppace(args_string);
-    separator = strchr(arg_string,',');
+    separator = strchr(args_string,',');
     if(!separator  && asm_def->args_allow_src) {
         sprintf(ast->syntax_error,"missing ',' separator for instruction:'%s'",asm_def->name);
         return;
