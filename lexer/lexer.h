@@ -3,24 +3,32 @@
 enum asm_op_type{
     ast_mov,
     ast_cmp,
-    ast_add
+    ast_add,
+
+    ast_op_undefined
 };
 
 enum asm_dir_type{
     dir_entry,
     dir_external,
     dir_data,
-    dir_string
-};
+    dir_string,
 
+
+
+
+    ast_dir_undefined
+};
+    enum ast_type {
+        ast_operation,
+        ast_directive,
+        ast_const_def,
+        ast_undefined
+    };
 struct ast {
     char syntax_error[200];
     char symbol[32];
-    enum  {
-        ast_operation,
-        ast_directive,
-        ast_const_def
-    }ast_type;
+    enum ast_type ast_type;
     union {
         struct {
             enum asm_op_type aot;
@@ -77,6 +85,6 @@ struct ast {
  * @param line
  * @return struct ast
  */
-struct ast lexer_get_ast(const char * line);
+struct ast lexer_get_ast( char * line);
 
 #endif

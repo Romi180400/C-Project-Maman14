@@ -61,7 +61,7 @@ static void back_print_ob(const int *code_section,
 }
 void back_main(const struct translation_unit *tu,const char *b_name) {
     if(tu->entries_count >0) {
-        back_print_ent(tu->entries,tu->entries_count,b_name);
+        back_print_ent((const struct symbol *)tu->entries,tu->entries_count,b_name);
     }
     if(tu->external_arr_size >0) {
         back_print_ext(tu->external_arr,tu->external_arr_size,b_name);

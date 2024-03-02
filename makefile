@@ -1,6 +1,6 @@
 CFLAGS = -ansi -pedantic -Wall -g -fsanitize=address
 
-assembler:lexer.o assembler.o back.o main.o translation_unit.o
+assembler:lexer.o assembler.o back.o main.o translation_unit.o utils.o preproc.o
 	gcc $(CFLAGS) $^ -o $@
 
 lexer.o: lexer/lexer.c lexer/lexer.h
@@ -14,8 +14,13 @@ main.o: main.c translation_unit.h
 translation_unit.o: translation_unit.c translation_unit.h
 	gcc $(CFLAGS) $< -c 
 
+utils.o: utils.c utils.h
+	gcc $(CFLAGS) $< -c
+preproc.o: preproc.c
+	gcc $(CFLAGS) $< -c
+
 clean:
-	rm -f *.o
+	rm -f *.o *.out
 	rm -f assembler
 	rm -f mmn14.zip
 zip: clean

@@ -4,7 +4,7 @@
 
 
 
-char * pre_processor(const char *f_name);
+char * pre_processor(const char *b_name);
 
 
 #endif

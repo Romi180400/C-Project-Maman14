@@ -6,15 +6,14 @@
 #define PROG_BASE 100
 
 
-void back_main(const struct translation_unit *tu);
+void back_main(const struct translation_unit *tu,const char *b_name);
 /**
  * @brief builds the program
  *
  * @return int
  */
-static int assembler_second_pass(struct translation_unit * tu) {
+static int assembler_second_pass(struct translation_unit * tu,FILE * am_file, const char *am_file_name) {
     char line_buffer[100] = {0};
-    FILE * in;
     struct ast AST;
     int str_len;
     struct symbol * symbol_s;
@@ -22,7 +21,8 @@ static int assembler_second_pass(struct translation_unit * tu) {
     int line_counter = 1;
     int machine_code;
     int i;
-    while(fgets(line_buffer,sizeof(line_buffer),in)) {
+    rewind(am_file);
+    while(fgets(line_buffer,sizeof(line_buffer),am_file)) {
         AST = lexer_get_ast(line_buffer);
         if(AST.ast_type == ast_directive && AST.ast_options.ast_dir.adt > dir_external) {
             if(AST.ast_options.ast_dir.adt == dir_string) {
@@ -111,22 +111,22 @@ static int assembler_second_pass(struct translation_unit * tu) {
         }
         line_counter++;
     }
+    return ok_flag;
 }
 /**
  * @brief builds the symbol table
  *
  * @return int
  */
-static int assembler_first_pass(struct translation_unit * tu) {
+static int assembler_first_pass(struct translation_unit * tu,FILE * am_file, const char *am_file_name) {
     char line_buffer[100] = {0};
-    FILE * in;
     struct ast AST;
     struct symbol * symbol_s;
     int ok_flag =1;
     int line_counter = 1;
     int IC = PROG_BASE, DC = 0;
     int i;
-    while(fgets(line_buffer,sizeof(line_buffer),in)) {
+    while(fgets(line_buffer,sizeof(line_buffer),am_file)) {
         AST = lexer_get_ast(line_buffer);
         if(AST.syntax_error[0] != '\0') {
             ok_flag = 0;
@@ -234,15 +234,19 @@ static int assembler_first_pass(struct translation_unit * tu) {
 }
 
 void assembler_main_routine(int file_count, char ** file_names) {
-    char * am;
+    char * am_file_name;
+    FILE * am_FILE;
     int i;
     struct translation_unit tu_for_each = {0};
     for(i=0;i<file_count;i++) {
-        if( am = pre_processor(file_names[i]) ) {
-            memset(&tu_for_each,0,sizeof(tu_for_each));
-            if(assembler_first_pass(&tu_for_each)) {
-                if(assembler_second_pass(&tu_for_each)) {
-
+        if( (am_file_name = pre_processor(file_names[i])) ) {
+            am_FILE = fopen(am_file_name,"r");
+            if(am_FILE) {
+                memset(&tu_for_each,0,sizeof(tu_for_each));
+                if(assembler_first_pass(&tu_for_each,am_FILE,am_file_name)) {
+                    if(assembler_second_pass(&tu_for_each,am_FILE,am_file_name)) {
+                        back_main(&tu_for_each,file_names[i]);
+                    }
                 }
             }
         }
