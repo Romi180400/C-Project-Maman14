@@ -3,8 +3,11 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <stdio.h>
+#include <errno.h>
+#define C_MAX 2047
+#define C_MIN -2048
 #define SPACES " \t\f\r\v"
-#define after_sppace(s) while(isspace(*s))s++
+#define after_sppace(s) while(isspace((*s)))(s++)
 /**
  * @brief
  * @param name - name
@@ -24,7 +27,7 @@ struct asm_defintion {
 };
 /**
  * @brief
- * @param args_allow - L - label D - number(this is immd both symbol and numeric) R - register I - index with symbol
+ * @param args_allow - L - label D - constant(this is immd both symbol and numeric) R - register I - index with symbol
  */
 static struct asm_defintion asm_table[16] = {
         {ast_mov,"mov","LDRI", "LRI"},
@@ -33,7 +36,7 @@ static struct asm_defintion asm_table[16] = {
 static struct directive_definition dir_table[4] = {
         {dir_external,".extern","L"},
         {dir_entry,".entry","L"},
-        {dir_data,".data","D^"},
+        {dir_data,".data","^"},
         {dir_string,".string","S"}
 };
 
@@ -45,11 +48,9 @@ struct parse_args_result {
         arg_symbol,
         arg_array_index,
         arg_register,
-        arg_string
     }type;
     union {
         char *symbol;
-        char * string;
         long immed;
         long reg;
         struct{
@@ -61,11 +62,39 @@ struct parse_args_result {
     }result;
 };
 
-static int my_strtol(char * number_candidate, long * result);
+/**
+ * @brief 
+ * 
+ * @param number_candidate 
+ * @param result 
+ * @param endptr_space 
+ * @param max 
+ * @param min 
+ * @return int -1 overflow , -2 no number
+ */
+static int my_strtol(char * number_candidate, long * result,char **endptr_space,int max, int min) {
+    errno = 0;
+    *result = strtol(number_candidate,endptr_space,10);
+    if(errno == ERANGE || *result > max || *result < min)
+        return -1;
+    if(*endptr_space == number_candidate)
+        return -2;
+    after_sppace(*endptr_space);
+    return 0;
+}
 
 static int is_valid_symbol(char *symbol_candidate,char ** symbol_ret);
 
-static struct parse_args_result parse_args(char * args_string,const char * args_allow);
+static struct parse_args_result parse_args(char * args_string,const char * args_allow) {
+    after_sppace(args_string);
+    if(*args_string == '#') {
+        args_string++;
+
+    }
+    else if(*args_string == 'r') {
+
+    }
+}
 
 static void parse_asm_arg(struct parse_args_result * par,int src_or_dest, struct ast * ast) {
     switch (par->type)
@@ -80,10 +109,11 @@ static void parse_asm_arg(struct parse_args_result * par,int src_or_dest, struct
             break;
         case arg_array_index:
             ast->ast_options.ast_op.operands[src_or_dest].operand_option = operand_array_index;
+            ast->ast_options.ast_op.operands[src_or_dest].operand.array_index.symbol = par->result.array_index.symbol;
             if(par->result.array_index.index_num_or_symbol == array_index_label) {
-                ast->ast_options.ast_op.operands[src_or_dest].operand.array_index.index_pair.label = par->result.array_index.symbol;
+                ast->ast_options.ast_op.operands[src_or_dest].operand.array_index.index_symbol = par->result.array_index.index_symbol;
             }else {
-                ast->ast_options.ast_op.operands[src_or_dest].operand.array_index.index_pair.index = par->result.array_index.index;
+                ast->ast_options.ast_op.operands[src_or_dest].operand.array_index.index = par->result.array_index.index;
             }
             break;
         case arg_symbol:
@@ -142,6 +172,11 @@ static void parse_asm_args(char *args_string,struct asm_defintion *asm_def,struc
 }
 static void parse_dir_args(char *args_string, struct directive_definition * asm_dir_def,struct ast * ast)  {
     char *t1,*t2;
+    after_sppace(args_string);
+    if(*args_string == '\0') {
+        sprintf(ast->syntax_error,"no arguments provided for directive:'%s'.",asm_dir_def->name);
+        return;
+    }
     switch(asm_dir_def->adt) {
         case dir_entry: case dir_external:
             t1 = strpbrk(args_string,SPACES);
@@ -162,6 +197,7 @@ static void parse_dir_args(char *args_string, struct directive_definition * asm_
             }
             break;
         case dir_data:
+        
             break;
         case dir_string:
             t1 = strchr(args_string,'"');
@@ -238,6 +274,7 @@ struct ast lexer_get_ast(char * line) {
     char * t1;
     /* algo goes here...*/
     line[strcspn(line, "\r\n")] = 0;
+    after_sppace(line);
     switch(lexer_get_type(line,&new_ast.ast_options.ast_op.aot,&new_ast.ast_options.ast_dir.adt,&args)) {
         case ast_operation:
             parse_asm_args(args,&asm_table[new_ast.ast_options.ast_op.aot],&new_ast);
@@ -246,6 +283,23 @@ struct ast lexer_get_ast(char * line) {
             parse_dir_args(args,&dir_table[new_ast.ast_options.ast_dir.adt],&new_ast);
         break;
         case ast_const_def:
+            if(*args == '\0') {
+                sprintf(new_ast.syntax_error,"missing argument for .define.");
+            }else {
+                switch(my_strtol(args,&new_ast.ast_options.define_num,&t1,C_MAX,C_MIN)) {
+                    case 0:
+                        if(*t1 != '\0'){
+                            sprintf(new_ast.syntax_error,"extra argument'%s' for .define.",t1);
+                        }
+                    break;
+                    case -1:
+                        sprintf(new_ast.syntax_error,"number:'%s'  for define overflows",args);
+                    break;
+                    case -2:
+                        sprintf(new_ast.syntax_error,"arguments:'%s' for .define are invalid.",args);
+                    break;
+                }
+            }
         break;
         case ast_undefined:
             sprintf(new_ast.syntax_error,"undefined keyword:'%s'.",line);

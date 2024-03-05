@@ -13,10 +13,6 @@ enum asm_dir_type{
     dir_external,
     dir_data,
     dir_string,
-
-
-
-
     ast_dir_undefined
 };
     enum ast_type {
@@ -46,15 +42,13 @@ struct ast {
                     int reg;
                     char * symbol;
                     struct {
-                        struct { /* symbol AND index*/
-                            char * symbol;
-                            enum {
-                                array_index_label,
-                                array_index_number
-                            }index_num_or_symbol;
-                            int index;
-                            char *label;
-                        }index_pair;
+                        char * symbol;
+                        enum {
+                            array_index_label,
+                            array_index_number
+                        }index_num_or_symbol;
+                        int index;
+                        char *index_symbol;
                     }array_index;
                 }operand;
             }operands[2];
@@ -65,9 +59,16 @@ struct ast {
                 char * symbol;
                 char * string;
                 struct {
-                    int data[90];
-                    int array_size;
-                }data_array;
+                    enum {
+                        data_define_symbol,
+                        data_const_num
+                    }data_type[82];
+                    union {
+                        char * define_symbol;
+                        int number;
+                    }data_options[82];
+                    int data_count;
+                }data;
             }dir_option;
         }ast_dir;
 

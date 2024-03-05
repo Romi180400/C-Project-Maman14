@@ -3,6 +3,7 @@
 #include "preproc.h"
 #include "translation_unit.h"
 #include <string.h>
+#include "utils.h"
 #define PROG_BASE 100
 
 
@@ -16,7 +17,7 @@ static int assembler_second_pass(struct translation_unit * tu,FILE * am_file, co
     char line_buffer[100] = {0};
     struct ast AST;
     int str_len;
-    struct symbol * symbol_s;
+    struct symbol * symbol_s, * symbol_s2;
     int ok_flag =1;
     int line_counter = 1;
     int machine_code;
@@ -30,9 +31,21 @@ static int assembler_second_pass(struct translation_unit * tu,FILE * am_file, co
                 memcpy(&tu->data_section[tu->data_section_size],AST.ast_options.ast_dir.dir_option.string,str_len);
                 tu->data_section_size += str_len +1;
             }else {
-                memcpy(&tu->data_section[tu->data_section_size],
-                AST.ast_options.ast_dir.dir_option.data_array.data,AST.ast_options.ast_dir.dir_option.data_array.array_size * sizeof(int));
-                tu->data_section_size += AST.ast_options.ast_dir.dir_option.data_array.array_size;
+                for(i=0;i<AST.ast_options.ast_dir.dir_option.data.data_count;i++) {
+                    if(AST.ast_options.ast_dir.dir_option.data.data_type == data_define_symbol) {
+                        symbol_s = symbol_table_search(tu,AST.ast_options.ast_dir.dir_option.data.data_options[i].define_symbol);
+                        if(symbol_s) {
+                            machine_code = symbol_s->constant_number;
+                        }else {
+                            asm_prnt_err(am_file_name,line_counter,"undefined symbol:'%s'.");
+                            ok_flag = 0;
+                        }
+                    }else {
+                        machine_code =AST.ast_options.ast_dir.dir_option.data.data_options[i].number;
+                    }
+                    tu->data_section[tu->data_section_size] = machine_code;
+                    tu->data_section_size++;
+                }
             }
         }else if(AST.ast_type == ast_operation) {
             machine_code = AST.ast_options.ast_op.aot << 6;
@@ -85,27 +98,47 @@ static int assembler_second_pass(struct translation_unit * tu,FILE * am_file, co
                                     /* error , symbol : wast not found in symbol table*/
                                 }
                             }
+                            tu->code_section[tu->code_section_size] = machine_code;
+                            tu->code_section_size++;
                     }
                     else { /* operand_array_index */
-                        symbol_s = symbol_table_search(tu,AST.ast_options.ast_op.operands[i].operand.array_index.index_pair.label);
+                        symbol_s = symbol_table_search(tu,AST.ast_options.ast_op.operands[i].operand.array_index.symbol);
                         if(symbol_s) {
                             if(symbol_s->symbol_type != symbol_entry_data && symbol_s->symbol_type != symbol_data) {
 
                                 ok_flag =0;
                                 /* symbol X is not a data symbol and therefore cannot use array index*/
                             }
-                            if(AST.ast_options.ast_op.operands[i].operand.array_index.index_pair.index <0 ||
-                                (AST.ast_options.ast_op.operands[i].operand.array_index.index_pair.index >= symbol_s->data_or_str_size )) {
-                                /* symbol X with index Y is outside of bounds of this array/string*/
-                                ok_flag =0;
+                            if(AST.ast_options.ast_op.operands[i].operand.array_index.index_num_or_symbol == array_index_number) {
+                                if(AST.ast_options.ast_op.operands[i].operand.array_index.index <0 ||
+                                    (AST.ast_options.ast_op.operands[i].operand.array_index.index >= symbol_s->data_or_str_size )) {
+                                            /* symbol X with index Y is outside of bounds of this array/string*/
+                                    ok_flag =0;
+                                }else {
+                                    machine_code = AST.ast_options.ast_op.operands[i].operand.array_index.index;
+                                }
+                            }else {
+                                symbol_s2 = symbol_table_search(tu,AST.ast_options.ast_op.operands[i].operand.array_index.index_symbol);
+                                if(symbol_s2) {
+                                    if(symbol_s2->constant_number <0 ||
+                                        (symbol_s2->constant_number >= symbol_s->data_or_str_size )) {
+                                            /* symbol X with index Y is outside of bounds of this array/string*/
+                                        ok_flag =0;
+                                    }
+                                    else {
+                                        machine_code = symbol_s2->constant_number;
+                                    }
+                                }else {
+                                    ok_flag = 0;
+                                     /* error , symbol : wast not found in symbol table*/                                   
+                                }
                             }
                         }else {
                             ok_flag = 0;
                             /* error , symbol : wast not found in symbol table*/
                         }
                     }
-                    tu->code_section[tu->code_section_size] = machine_code;
-                    tu->code_section_size++;
+
                 }
             }
         }
@@ -129,6 +162,7 @@ static int assembler_first_pass(struct translation_unit * tu,FILE * am_file, con
     while(fgets(line_buffer,sizeof(line_buffer),am_file)) {
         AST = lexer_get_ast(line_buffer);
         if(AST.syntax_error[0] != '\0') {
+    struct symbol * symbol_s;
             ok_flag = 0;
             /* remember to print somehow the syntax error*/
         }else {
@@ -182,7 +216,7 @@ static int assembler_first_pass(struct translation_unit * tu,FILE * am_file, con
                             strlen(AST.ast_options.ast_dir.dir_option.string) + 1);
                         }else {
                             symbol_table_insert(tu,AST.symbol,symbol_data,DC,line_counter,0,
-                            AST.ast_options.ast_dir.dir_option.data_array.array_size);
+                            AST.ast_options.ast_dir.dir_option.data.data_count);
                         }
                         
                     }
@@ -191,7 +225,7 @@ static int assembler_first_pass(struct translation_unit * tu,FILE * am_file, con
             }
             if(AST.ast_type == ast_directive && AST.ast_options.ast_dir.adt > dir_external ) {
                 if(AST.ast_options.ast_dir.adt == dir_data) {
-                    DC += AST.ast_options.ast_dir.dir_option.data_array.array_size;
+                    DC += AST.ast_options.ast_dir.dir_option.data.data_count;
                 }else {
                        for(i=0;i<tu->symbol_table_size;i++) {
         if(tu->symbol_table[i].symbol_type == symbol_entry) {
