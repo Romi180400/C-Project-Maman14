@@ -23,7 +23,7 @@ enum asm_dir_type{
     };
 struct ast {
     char syntax_error[200];
-    char symbol[32];
+    char *symbol;
     enum ast_type ast_type;
     union {
         struct {

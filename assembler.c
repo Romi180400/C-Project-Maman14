@@ -109,28 +109,29 @@ static int assembler_second_pass(struct translation_unit * tu,FILE * am_file, co
                                 ok_flag =0;
                                 /* symbol X is not a data symbol and therefore cannot use array index*/
                             }
+                            tu->code_section[tu->code_section_size++] = (symbol_s->address << 2) | 2; 
                             if(AST.ast_options.ast_op.operands[i].operand.array_index.index_num_or_symbol == array_index_number) {
                                 if(AST.ast_options.ast_op.operands[i].operand.array_index.index <0 ||
                                     (AST.ast_options.ast_op.operands[i].operand.array_index.index >= symbol_s->data_or_str_size )) {
                                             /* symbol X with index Y is outside of bounds of this array/string*/
                                     ok_flag =0;
                                 }else {
-                                    machine_code = AST.ast_options.ast_op.operands[i].operand.array_index.index;
+                                    tu->code_section[tu->code_section_size++] = AST.ast_options.ast_op.operands[i].operand.array_index.index << 2;
                                 }
                             }else {
                                 symbol_s2 = symbol_table_search(tu,AST.ast_options.ast_op.operands[i].operand.array_index.index_symbol);
-                                if(symbol_s2) {
+                                if(symbol_s2 && symbol_s2->symbol_type == symbol_const_number) {
                                     if(symbol_s2->constant_number <0 ||
                                         (symbol_s2->constant_number >= symbol_s->data_or_str_size )) {
                                             /* symbol X with index Y is outside of bounds of this array/string*/
                                         ok_flag =0;
                                     }
                                     else {
-                                        machine_code = symbol_s2->constant_number;
+                                        tu->code_section[tu->code_section_size++] = symbol_s2->constant_number << 2;
                                     }
                                 }else {
                                     ok_flag = 0;
-                                     /* error , symbol : wast not found in symbol table*/                                   
+                                     /* error , symbol : wast not found in symbol table or the symbol was not defined as a const number*/                                   
                                 }
                             }
                         }else {
