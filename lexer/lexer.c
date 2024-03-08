@@ -6,6 +6,8 @@
 #include <errno.h>
 #define C_MAX 2047
 #define C_MIN -2048
+#define REG_MIN 0
+#define REG_MAX 7
 #define SPACES " \t\f\r\v"
 #define after_sppace(s) while(isspace((*s)))((s++))
 /**
@@ -27,25 +29,25 @@ struct asm_defintion {
 };
 /**
  * @brief
- * @param args_allow - L - label D - constant(this is immd both symbol and numeric) R - register I - index with symbol
+ * @param args_allow - 1L - label 0D - constant(this is immd both symbol and numeric) 3R - register 2I - index with symbol
  */
 static struct asm_defintion asm_table[16] = {
         {ast_mov,"mov","LDRI", "LRI"},
         {ast_cmp,"cmp","LDRI","LDRI"},
-        {ast_cmp,"cmp","LDRI","LDRI"},
-        {ast_cmp,"cmp","LDRI","LDRI"},
-        {ast_cmp,"cmp","LDRI","LDRI"},
-        {ast_cmp,"cmp","LDRI","LDRI"},
-        {ast_cmp,"cmp","LDRI","LDRI"},
-        {ast_cmp,"cmp","LDRI","LDRI"},
-        {ast_cmp,"cmp","LDRI","LDRI"},
-        {ast_cmp,"cmp","LDRI","LDRI"},
-        {ast_cmp,"cmp","LDRI","LDRI"},
-        {ast_cmp,"cmp","LDRI","LDRI"},
-        {ast_cmp,"cmp","LDRI","LDRI"},
-        {ast_cmp,"cmp","LDRI","LDRI"},
-        {ast_cmp,"cmp","LDRI","LDRI"},
-        {ast_cmp,"cmp","LDRI","LDRI"},
+        {ast_add,"add","LDRI","LRI"},
+        {ast_sub,"sub","LDRI","LRI"},
+        {ast_not,"not",NULL,"LRI"},
+        {ast_clr,"clr",NULL,"LRI"},
+        {ast_lea,"lea","LI","DI"},
+        {ast_inc,"inc",NULL,"LRI"},
+        {ast_dec,"dec",NULL,"LRI"},
+        {ast_jmp,"jmp",NULL,"LR"},
+        {ast_bne,"bne",NULL,"LR"},
+        {ast_red,"red",NULL,"LRI"},
+        {ast_prn,"prn",NULL,"LDRI"},
+        {ast_jsr,"jsr",NULL,"LR"},
+        {ast_rts,"rts",NULL,NULL},
+        {ast_hlt,"hlt",NULL,NULL},
 };
 static struct directive_definition dir_table[4] = {
         {dir_external,".extern","L"},
@@ -138,18 +140,57 @@ static int is_valid_symbol(char *symbol_candidate,int allow_spaces,char **endptr
 
 static struct parse_args_result parse_args(char * args_string,const char * args_allow) {
     struct parse_args_result par = {0};
+    char *t1;
+    char *t2 = NULL;
+    int d;
     after_sppace(args_string);
     if(*args_string == '#') {
         args_string++;
-
+        /* maybe its symbol now, or another constant number*/
+        if(is_valid_symbol(args_string,1,&t1) == 0) {
+            par.type = arg_immed_symbol;
+        }else {
+            if(my_strtol(args_string,&par.result.immed,&t1,C_MAX,C_MIN) == 0) {
+                par.type = arg_immed;
+            }else {
+                sprintf(par.arg_syntax_error,"expected symbol or constant after '#' token.");
+            }
+        }
     }
     else if(*args_string == 'r') {
+        args_string++;
+        if(my_strtol(args_string,&par.result.reg,&t1,REG_MAX,REG_MIN) == 0) {
+            par.type = arg_register;
+        }else {
+            sprintf(par.arg_syntax_error,"expected number after 'r' token.");
+        }
+    }
+    /* maybe its symbol? */
+    d = is_valid_symbol(args_string,1,&t1);
+    if( d == 0 || ( d !=0 && *t1 == '[')) {
+        if(*t1 == '[') {
+            *t1 = '\0';
+            t1++;
+            /* maybe its symbol now, or another constant number*/
+            if(is_valid_symbol(t1,1,&t2) == 0) {
+                par.type = arg_immed_symbol;
+            }else {
+            if(my_strtol(args_string,&par.result.immed,&t1,C_MAX,C_MIN) == 0) {
+                par.type = arg_immed;
+            }else {
+                sprintf(par.arg_syntax_error,"expected symbol or constant after '#' token.");
+            }
+        }
+        }else {
 
+        }   
+    }else {
+        sprintf(par.arg_syntax_error,"undefined argument:'%s'",args_string);
     }
     return par;
 }
 
-static void parse_asm_arg(struct parse_args_result * par,int src_or_dest, struct ast * ast) {
+static void insert_par_asm_arg(struct parse_args_result * par,int src_or_dest, struct ast * ast) {
     switch (par->type)
     {
         case arg_immed:

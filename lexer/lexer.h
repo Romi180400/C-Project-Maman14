@@ -4,7 +4,20 @@ enum asm_op_type{
     ast_mov,
     ast_cmp,
     ast_add,
-
+    ast_sub,
+    ast_not,
+    ast_clr,
+    ast_lea,
+    ast_inc,
+    ast_dec,
+    ast_jmp,
+    ast_bne,
+    ast_red,
+    ast_red,
+    ast_prn,
+    ast_jsr,
+    ast_rts,
+    ast_hlt,
     ast_op_undefined
 };
 
