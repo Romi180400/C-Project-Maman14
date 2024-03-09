@@ -11,8 +11,9 @@ int main() {
     if(test_f) {
         while(fgets(buffer,sizeof(buffer),test_f)) {
             n_ast = lexer_get_ast(buffer);
+            line_c++;
         }
-        line_c++;
+        
     }
     return 0;
 }

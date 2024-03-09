@@ -6,6 +6,8 @@
 #include <errno.h>
 #define C_MAX 2047
 #define C_MIN -2048
+#define C_MAX_DATA 8191
+#define C_MIN_DATA -8192
 #define REG_MIN 0
 #define REG_MAX 7
 #define SPACES " \t\f\r\v"
@@ -59,16 +61,19 @@ static struct directive_definition dir_table[4] = {
 struct parse_args_result {
     char arg_syntax_error[100];
     enum {
+        arg_none,
         arg_immed,
         arg_immed_symbol,
         arg_symbol,
         arg_array_index,
-        arg_register
+        arg_register,
+        arg_number = 20
     }type;
     union {
         char *symbol;
-        long immed;
-        long reg;
+        int immed;
+        int reg;
+        int number;
         struct{
             char * symbol;
             int index_num_or_symbol;
@@ -95,7 +100,7 @@ static int my_strtol(char * number_candidate, int * result,char **endptr_space,i
         return -1;
     if(*endptr_space == number_candidate)
         return -2;
-    after_sppace(*endptr_space);
+    after_sppace((*endptr_space));
     return 0;
 }
 /**
@@ -132,14 +137,30 @@ static int is_valid_symbol(char *symbol_candidate,int allow_spaces,char **endptr
                 symbol_candidate++;(*endptr)++; str_len++;
             }
         }
-        after_sppace(*endptr);
+        after_sppace((*endptr));
         if( str_len > 31)
             return -1;
         return 0;
 }
-
+static char get_parse_args_char_val(int parse_args_type) {
+    switch(parse_args_type) {
+        case arg_symbol:
+            return 'L';
+        case arg_immed_symbol: case arg_immed:
+            return 'D';
+        case arg_register:
+            return 'R';
+        case arg_array_index:
+            return 'I'; 
+        case arg_number:
+            return 'E';
+        default:
+            return 'U';
+    }
+}
 static struct parse_args_result parse_args(char * args_string,const char * args_allow) {
     struct parse_args_result par = {0};
+    struct parse_args_result par2 = {0};
     char *t1;
     char *t2 = NULL;
     int d;
@@ -165,32 +186,66 @@ static struct parse_args_result parse_args(char * args_string,const char * args_
             sprintf(par.arg_syntax_error,"expected number after 'r' token.");
         }
     }
+    /* maybe its just a number ?*/
+    if((d = my_strtol(args_string,&par.result.number,&t1,C_MAX,C_MIN)) == 0) {
+        par.type = arg_number;
+        return par;
+    }
+    else if(d == -1) {
+        sprintf(par.arg_syntax_error,"number overflows:'%s'",args_string);
+        return par;
+    }
     /* maybe its symbol? */
     d = is_valid_symbol(args_string,1,&t1);
     if( d == 0 || ( d !=0 && *t1 == '[')) {
         if(*t1 == '[') {
-            *t1 = '\0';
             t1++;
-            /* maybe its symbol now, or another constant number*/
-            if(is_valid_symbol(t1,1,&t2) == 0) {
-                par.type = arg_immed_symbol;
+            after_sppace(t1);
+            t2 = strchr(t1,']');
+            if(t2) {
+                if(t2 -t1 == 1) {
+                    sprintf(par.arg_syntax_error,"empty paramter inside []");
+                }else {
+                    *t2 = '\0';
+                    par2 = parse_args(t1,"EL");
+                    if(par2.arg_syntax_error[0] != '\0') {
+                        strcpy(par.arg_syntax_error,par2.arg_syntax_error);
+                    }else {
+                        switch(par2.type) {
+                            case arg_symbol:
+                                par.type = arg_array_index;
+                                par.result.array_index.symbol = args_string;
+                                par.result.array_index.index = par2.result.number;
+                            break;
+                            case arg_number:
+                                par.type = arg_array_index;
+                                par.result.array_index.symbol = args_string;
+                                par.result.array_index.index_symbol = par2.result.symbol;
+                            break;
+                            default:
+                                sprintf(par.arg_syntax_error,"undefined or unsupported arg inside brackets:'%s'",t1);
+                            break;
+                        }
+                    }
+                }
             }else {
-            if(my_strtol(args_string,&par.result.immed,&t1,C_MAX,C_MIN) == 0) {
-                par.type = arg_immed;
-            }else {
-                sprintf(par.arg_syntax_error,"expected symbol or constant after '#' token.");
+                 sprintf(par.arg_syntax_error,"missing closing brackets:'%s'",t1);
             }
-        }
         }else {
-
-        }   
-    }else {
-        sprintf(par.arg_syntax_error,"undefined argument:'%s'",args_string);
+            /* just a symbol*/
+            t1 = strpbrk(args_string,SPACES);
+            if(t1) *t1 = '\0';
+            par.type = arg_symbol;
+            par.result.symbol = args_string;
+        }
+    }
+    if(strchr(args_allow,get_parse_args_char_val(par.type)) == NULL) {
+        sprintf(par.arg_syntax_error,"undefined or unsupported operand:'%s'",args_string);
     }
     return par;
 }
 
-static void insert_par_asm_arg(struct parse_args_result * par,int src_or_dest, struct ast * ast) {
+static void parse_asm_arg(struct parse_args_result * par,int src_or_dest, struct ast * ast) {
     switch (par->type)
     {
         case arg_immed:
@@ -287,38 +342,49 @@ static void parse_dir_args(char *args_string, struct directive_definition * asm_
             break;
         case dir_data:
             do {
-                switch(my_strtol(args_string,&ast->ast_options.ast_dir.dir_option.data.data_options[data_count].number,&t1,C_MAX,C_MIN)) {
-                    case 0:
-                        ast->ast_options.ast_dir.dir_option.data.data_type[data_count] = data_const_num;
-                        data_count++;
-                        if(*t1 == ',')
-                            args_string = t1+1;
-                        else {
-                            sprintf(ast->syntax_error,"missing separator:'%s'",t1);
-                            return;
-                        }
-                    break;
-                    case -1:
-                        sprintf(ast->syntax_error,"number:'%s' overflows out of rage",args_string);
-                        return;
-                    break;
-                    case -2:
-                        r =  is_valid_symbol(args_string,1,&t1);
-                        if( r == 0 ||  (r!=0  && *t1 == ',')) {
-                            ast->ast_options.ast_dir.dir_option.data.data_options[data_count].define_symbol = args_string;
-                            ast->ast_options.ast_dir.dir_option.data.data_type[data_count] = data_define_symbol;
-                            data_count++;
-                            if(*t1 == ',') {
-                                *t1 ='\0';
-                                args_string = t1+1;
-                            }
-                        }else {
-                            sprintf(ast->syntax_error,"string:'%s' is invalid symbol or number.",args_string);
-                            return;
-                        }
-                    break;
+                t1 = strchr(args_string,',');
+                if(t1) {
+                    *t1 = '\0';
                 }
-            }while(*args_string);
+                r = is_valid_symbol(args_string,1,&t2);
+                if(r == 0) {
+                    if(*t2 != '\0') {
+                        sprintf(ast->syntax_error,"extra text for operand:'%s'",args_string);
+                        return;
+                    }else {
+                        t2 = strpbrk(args_string,SPACES);
+                        if(t2) {
+                            *t2 = '\0';
+                        }
+                    }
+                    ast->ast_options.ast_dir.dir_option.data.data_options[data_count].define_symbol = args_string;
+                    ast->ast_options.ast_dir.dir_option.data.data_type[data_count] = data_define_symbol;
+                    data_count++;
+                }else {
+                    switch(my_strtol(args_string,&ast->ast_options.ast_dir.dir_option.data.data_options[data_count].number,&t1,C_MAX_DATA,C_MIN_DATA)) {
+                        case -1:
+                            sprintf(ast->syntax_error,"number overflows out of range:'%s'",args_string);
+                        break;
+                        case -2:
+                            sprintf(ast->syntax_error,"argument is not a symbol or a valid number:'%s'",args_string);
+                        break;
+                        case 0:
+                            if(*t1 != '\0') {
+                                sprintf(ast->syntax_error,"extra text for argument:'%s'",args_string);
+                            }else {
+                                ast->ast_options.ast_dir.dir_option.data.data_type[data_count] = data_const_num;
+                                data_count++;
+                            }     
+                        break;
+                    }
+                }
+                if(t1) {
+                    args_string = t1+1;
+                }else {
+                    args_string = NULL;
+                }
+            }while(args_string);
+            ast->ast_options.ast_dir.dir_option.data.data_count = data_count;
             break;
         case dir_string:
             t1 = strchr(args_string,'"');
@@ -410,6 +476,7 @@ struct ast lexer_get_ast(char * line) {
         }
         line = t1 + 1;
     }
+    after_sppace(line);
     switch(lexer_get_type(line,&new_ast.ast_options.ast_op.aot,&new_ast.ast_options.ast_dir.adt,&args)) {
         case ast_operation:
             parse_asm_args(args,&asm_table[new_ast.ast_options.ast_op.aot],&new_ast);

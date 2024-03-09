@@ -13,7 +13,6 @@ enum asm_op_type{
     ast_jmp,
     ast_bne,
     ast_red,
-    ast_red,
     ast_prn,
     ast_jsr,
     ast_rts,
