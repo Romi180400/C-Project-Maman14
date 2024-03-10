@@ -170,11 +170,14 @@ static struct parse_args_result parse_args(char * args_string,const char * args_
         /* maybe its symbol now, or another constant number*/
         if(is_valid_symbol(args_string,1,&t1) == 0) {
             par.type = arg_immed_symbol;
+            return par;
         }else {
             if(my_strtol(args_string,&par.result.immed,&t1,C_MAX,C_MIN) == 0) {
                 par.type = arg_immed;
+                return par;
             }else {
                 sprintf(par.arg_syntax_error,"expected symbol or constant after '#' token.");
+                return par;
             }
         }
     }
@@ -182,8 +185,10 @@ static struct parse_args_result parse_args(char * args_string,const char * args_
         args_string++;
         if(my_strtol(args_string,&par.result.reg,&t1,REG_MAX,REG_MIN) == 0) {
             par.type = arg_register;
+            return par;
         }else {
             sprintf(par.arg_syntax_error,"expected number after 'r' token.");
+            return par;
         }
     }
     /* maybe its just a number ?*/
@@ -269,6 +274,7 @@ static void parse_asm_arg(struct parse_args_result * par,int src_or_dest, struct
             ast->ast_options.ast_op.operands[src_or_dest].operand.symbol = par->result.symbol;
             break;
         case arg_register:
+            ast->ast_options.ast_op.operands[src_or_dest].operand_option = operand_register;
             ast->ast_options.ast_op.operands[src_or_dest].operand.reg = par->result.reg;
             break;
         default:
@@ -291,29 +297,30 @@ static void parse_asm_args(char *args_string,struct asm_defintion *asm_def,struc
         separator = '\0';
         par = parse_args(src,asm_def->args_allow_src);
         if(par.arg_syntax_error[0] != '\0') {
-            sprintf("error in source argument of instruction:'%s' : %s",asm_def->name,par.arg_syntax_error);
+            sprintf(ast->syntax_error,"error in source argument of instruction:'%s' : %s",asm_def->name,par.arg_syntax_error);
             return;
         }
         parse_asm_arg(&par,0,ast);
 
         par = parse_args(dest,asm_def->args_allow_dest);
         if(par.arg_syntax_error[0] != '\0') {
-            sprintf("error in destination argument of instruction:'%s' : %s",asm_def->name,par.arg_syntax_error);
+            sprintf(ast->syntax_error,"error in destination argument of instruction:'%s' : %s",asm_def->name,par.arg_syntax_error);
             return;
         }
         parse_asm_arg(&par,1,ast);
     }else {
+        dest = args_string;
         if(asm_def->args_allow_dest) {
             par = parse_args(dest,asm_def->args_allow_dest);
             if(par.arg_syntax_error[0] != '\0') {
-                sprintf("error in destination argument of instruction:'%s' : %s",asm_def->name,par.arg_syntax_error);
+                sprintf(ast->syntax_error,"error in destination argument of instruction:'%s' : %s",asm_def->name,par.arg_syntax_error);
                 return;
             }
             parse_asm_arg(&par,1,ast);
         }
         else {
             if(*args_string != '\0') {
-                sprintf("instruction :'%s' expects no arguments but have:'%s'",asm_def->name,args_string);
+                sprintf(ast->syntax_error,"instruction :'%s' expects no arguments but have:'%s'",asm_def->name,args_string);
                 return;
             }
         }
