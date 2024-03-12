@@ -40,6 +40,7 @@ static enum preproc_line_type preproc_get_line_type(char *line,struct macro_tabl
     after_sppace(line);
     strcpy(line_copy,line);
     line = line_copy;
+    line[strcspn(line, "\r\n")] = 0;
     if(*line == '\0')
         return preproc_null_line;
     t1 = strstr(line,"endmcr");
@@ -95,7 +96,7 @@ char * pre_processor(const char *b_name) {
     FILE * as_file, * am_file;
     struct macro_table mcr_tbl = {0};
     struct macro * macro_ptr;
-    as_name = m_strcat(b_name,".ass");
+    as_name = m_strcat(b_name,".as");
     am_name = m_strcat(b_name,".am");
     as_file = fopen(as_name,"r");
     am_file = fopen(am_name,"w");
@@ -106,7 +107,6 @@ char * pre_processor(const char *b_name) {
         return NULL;
     }
     while(fgets(buffer,sizeof(buffer),as_file)) {
-        buffer[strcspn(buffer, "\r\n")] = 0;
         t = strchr(buffer,';');
         if(t) {
             t1 = strchr(buffer,'"');
@@ -115,6 +115,8 @@ char * pre_processor(const char *b_name) {
                 if(t > t2 || t < t1) {
                     *t = '\0';
                 }
+            }else {
+                *t = '\0';
             }
         }
         switch(preproc_get_line_type(buffer,&mcr_tbl,&macro_ptr)) {
@@ -138,9 +140,10 @@ char * pre_processor(const char *b_name) {
             break;
             case preproc_other:
                 if(macro_ptr) {
-                    strcpy(macro_ptr->lines[i],buffer);
+                    strcpy(macro_ptr->lines[macro_ptr->line_c],buffer);
+                    macro_ptr->line_c++;
                 }else {
-                    fputs(macro_ptr->lines[i],am_file);
+                    fputs(buffer,am_file);
                 }
             break;
             case preproc_null_line:

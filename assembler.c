@@ -6,7 +6,6 @@
 #include "utils.h"
 #define PROG_BASE 100
 
-
 void back_main(const struct translation_unit *tu,const char *b_name);
 /**
  * @brief builds the program
@@ -32,12 +31,12 @@ static int assembler_second_pass(struct translation_unit * tu,FILE * am_file, co
                 tu->data_section_size += str_len +1;
             }else {
                 for(i=0;i<AST.ast_options.ast_dir.dir_option.data.data_count;i++) {
-                    if(AST.ast_options.ast_dir.dir_option.data.data_type == data_define_symbol) {
+                    if(AST.ast_options.ast_dir.dir_option.data.data_type[i] == data_define_symbol) {
                         symbol_s = symbol_table_search(tu,AST.ast_options.ast_dir.dir_option.data.data_options[i].define_symbol);
                         if(symbol_s) {
                             machine_code = symbol_s->constant_number;
                         }else {
-                            asm_prnt_err(am_file_name,line_counter,"undefined symbol:'%s'.");
+                            asm_prnt_err(am_file_name,line_counter,"undefined symbol:'%s'.",symbol_s->name);
                             ok_flag = 0;
                         }
                     }else {
@@ -163,9 +162,9 @@ static int assembler_first_pass(struct translation_unit * tu,FILE * am_file, con
     while(fgets(line_buffer,sizeof(line_buffer),am_file)) {
         AST = lexer_get_ast(line_buffer);
         if(AST.syntax_error[0] != '\0') {
-    struct symbol * symbol_s;
             ok_flag = 0;
             /* remember to print somehow the syntax error*/
+            asm_prnt_err(am_file_name,line_counter,"syntax error: %s.",AST.syntax_error);
         }else {
             if(AST.ast_type == ast_directive && AST.ast_options.ast_dir.adt <= dir_external ) {
                 symbol_s = symbol_table_search(tu,AST.ast_options.ast_dir.dir_option.symbol);
@@ -173,6 +172,7 @@ static int assembler_first_pass(struct translation_unit * tu,FILE * am_file, con
                     if(AST.ast_options.ast_dir.adt == dir_external ) {
                         ok_flag = 0;
                         /* remember to print error , this symbol is being declared as external but was already defined*/
+                        asm_prnt_err(am_file_name,line_counter,"symbol:'%s' was declared as external in line:'%s' symbol and now is being defined.",symbol_s->line_of_def);
                     }
                     else {
                         if(symbol_s->symbol_type == symbol_code) {
@@ -182,7 +182,8 @@ static int assembler_first_pass(struct translation_unit * tu,FILE * am_file, con
                             symbol_s->symbol_type = symbol_entry_data;
                         }else {
                             ok_flag = 0;
-                            /* remember to print error , this symbol is being declared as entry but was already defined*/                       
+                            /* remember to print error , this symbol is being declared as entry but was already defined*/         
+                            asm_prnt_err(am_file_name,line_counter,"symbol:'%s' was already defined in line: %d",symbol_s->line_of_def);              
                         }
                     }
 
@@ -193,7 +194,7 @@ static int assembler_first_pass(struct translation_unit * tu,FILE * am_file, con
                         symbol_table_insert(tu,AST.ast_options.ast_dir.dir_option.symbol,symbol_entry,0,line_counter,0,0);
                     }
                 }
-            }else if(AST.symbol[0] != '\0') {
+            }else if(AST.symbol != NULL) {
                 symbol_s = symbol_table_search(tu,AST.symbol);
                 if(symbol_s) {
                     if(symbol_s->symbol_type == symbol_entry) {
@@ -201,10 +202,17 @@ static int assembler_first_pass(struct translation_unit * tu,FILE * am_file, con
                             symbol_s->symbol_type = symbol_entry_code;
                             symbol_s->address = IC;
                             symbol_s->line_of_def = line_counter;
-                        }else {
+                        }
+                        else if(AST.ast_type == ast_directive) {
+                            symbol_s->symbol_type = symbol_entry_data;
+                            symbol_s->address = DC;
+                            symbol_s->line_of_def = line_counter;
+                        }
+                        else {
                             
                             ok_flag =0;
                             /* remember to print logical error , redefintion of symbol*/
+                            asm_prnt_err(am_file_name,line_counter,"symbol:'%s' was already defined in line: %d",symbol_s->name,symbol_s->line_of_def);   
                         }
                     }
                 }else {
@@ -228,15 +236,11 @@ static int assembler_first_pass(struct translation_unit * tu,FILE * am_file, con
                 if(AST.ast_options.ast_dir.adt == dir_data) {
                     DC += AST.ast_options.ast_dir.dir_option.data.data_count;
                 }else {
-                       for(i=0;i<tu->symbol_table_size;i++) {
-        if(tu->symbol_table[i].symbol_type == symbol_entry) {
-            /* remember to print error , symbol was declared entry but was never defined*/
-            ok_flag = 0;
-        }
-        if(tu->symbol_table[i].symbol_type == symbol_data || tu->symbol_table[i].symbol_type == symbol_entry_data) {
-            tu->symbol_table[i].address += IC;
-        }
-    } DC += strlen(AST.ast_options.ast_dir.dir_option.string) + 1;
+                for(i=0;i<tu->symbol_table_size;i++) {
+                    if(tu->symbol_table[i].symbol_type == symbol_data || tu->symbol_table[i].symbol_type == symbol_entry_data) {
+                        tu->symbol_table[i].address += IC;
+                    }
+            } DC += strlen(AST.ast_options.ast_dir.dir_option.string) + 1;
                 }
             }else if(AST.ast_type == ast_operation) {
                 IC++;
@@ -259,6 +263,7 @@ static int assembler_first_pass(struct translation_unit * tu,FILE * am_file, con
     for(i=0;i<tu->symbol_table_size;i++) {
         if(tu->symbol_table[i].symbol_type == symbol_entry) {
             /* remember to print error , symbol was declared entry but was never defined*/
+            asm_prnt_err(am_file_name,0,"symbol:'%s' was declared entry but was never defined in this file.",tu->symbol_table[i].name);
             ok_flag = 0;
         }
         if(tu->symbol_table[i].symbol_type == symbol_data || tu->symbol_table[i].symbol_type == symbol_entry_data) {
@@ -268,22 +273,29 @@ static int assembler_first_pass(struct translation_unit * tu,FILE * am_file, con
     return ok_flag;
 }
 
-void assembler_main_routine(int file_count, char ** file_names) {
-    char * am_file_name;
+
+
+
+
+
+int main(int argc, char ** argv) {
     FILE * am_FILE;
     int i;
-    struct translation_unit tu_for_each = {0};
-    for(i=0;i<file_count;i++) {
-        if( (am_file_name = pre_processor(file_names[i])) ) {
+    static struct translation_unit tu_for_each = {0};
+    char * am_file_name;
+    argc--;argv++;
+    for(i=0;i<argc;i++) {
+        if( (am_file_name = pre_processor(argv[i])) ) {
             am_FILE = fopen(am_file_name,"r");
             if(am_FILE) {
                 memset(&tu_for_each,0,sizeof(tu_for_each));
                 if(assembler_first_pass(&tu_for_each,am_FILE,am_file_name)) {
                     if(assembler_second_pass(&tu_for_each,am_FILE,am_file_name)) {
-                        back_main(&tu_for_each,file_names[i]);
+                        back_main(&tu_for_each,argv[i]);
                     }
                 }
             }
         }
     }
+    return 0;
 }

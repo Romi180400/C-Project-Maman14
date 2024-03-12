@@ -208,9 +208,6 @@ static struct parse_args_result parse_args(char * args_string,const char * args_
             after_sppace(t1);
             t2 = strchr(t1,']');
             if(t2) {
-                if(t2 -t1 == 1) {
-                    sprintf(par.arg_syntax_error,"empty paramter inside []");
-                }else {
                     *t2 = '\0';
                     par2 = parse_args(t1,"EL");
                     if(par2.arg_syntax_error[0] != '\0') {
@@ -232,7 +229,7 @@ static struct parse_args_result parse_args(char * args_string,const char * args_
                             break;
                         }
                     }
-                }
+                
             }else {
                  sprintf(par.arg_syntax_error,"missing closing brackets:'%s'",t1);
             }
@@ -285,6 +282,11 @@ static void parse_asm_args(char *args_string,struct asm_defintion *asm_def,struc
     struct parse_args_result par = {0};
     char * separator;
     char *src, *dest;
+    if(args_string == NULL && asm_def->args_allow_dest != NULL) {
+        sprintf(par.arg_syntax_error,"operation:'%s' expected arguments and has none.",asm_def->name);
+        return;
+    }else if(args_string == NULL)
+        return;
     after_sppace(args_string);
     separator = strchr(args_string,',');
     if(!separator  && asm_def->args_allow_src) {
@@ -294,7 +296,7 @@ static void parse_asm_args(char *args_string,struct asm_defintion *asm_def,struc
     if(separator) {
         src = args_string;
         dest = separator +1;
-        separator = '\0';
+        *separator = '\0';
         par = parse_args(src,asm_def->args_allow_src);
         if(par.arg_syntax_error[0] != '\0') {
             sprintf(ast->syntax_error,"error in source argument of instruction:'%s' : %s",asm_def->name,par.arg_syntax_error);
@@ -346,9 +348,14 @@ static void parse_dir_args(char *args_string, struct directive_definition * asm_
             if(*t2 !='\0') {
                 sprintf(ast->syntax_error,"extra text:'%s' after symbol for directive:'%s'",t2,asm_dir_def->name);
             }
+            t2 = strpbrk(args_string,SPACES);
+            if(t2) {
+                *t2 = '\0';
+            }
             break;
         case dir_data:
             do {
+                after_sppace(args_string);
                 t1 = strchr(args_string,',');
                 if(t1) {
                     *t1 = '\0';
@@ -368,7 +375,7 @@ static void parse_dir_args(char *args_string, struct directive_definition * asm_
                     ast->ast_options.ast_dir.dir_option.data.data_type[data_count] = data_define_symbol;
                     data_count++;
                 }else {
-                    switch(my_strtol(args_string,&ast->ast_options.ast_dir.dir_option.data.data_options[data_count].number,&t1,C_MAX_DATA,C_MIN_DATA)) {
+                    switch(my_strtol(args_string,&ast->ast_options.ast_dir.dir_option.data.data_options[data_count].number,&t2,C_MAX_DATA,C_MIN_DATA)) {
                         case -1:
                             sprintf(ast->syntax_error,"number overflows out of range:'%s'",args_string);
                         break;
@@ -376,7 +383,7 @@ static void parse_dir_args(char *args_string, struct directive_definition * asm_
                             sprintf(ast->syntax_error,"argument is not a symbol or a valid number:'%s'",args_string);
                         break;
                         case 0:
-                            if(*t1 != '\0') {
+                            if(*t2 != '\0') {
                                 sprintf(ast->syntax_error,"extra text for argument:'%s'",args_string);
                             }else {
                                 ast->ast_options.ast_dir.dir_option.data.data_type[data_count] = data_const_num;
@@ -468,7 +475,7 @@ static enum ast_type lexer_get_type(char * line,enum asm_op_type * aot, enum asm
 struct ast lexer_get_ast(char * line) {
     struct ast new_ast = {0};
     char * args;
-    char * t1;
+    char * t1,*t2;
     /* algo goes here...*/
     line[strcspn(line, "\r\n")] = 0;
     after_sppace(line);
@@ -497,18 +504,32 @@ struct ast lexer_get_ast(char * line) {
             if(*args == '\0') {
                 sprintf(new_ast.syntax_error,"missing argument for .define.");
             }else {
-                switch(my_strtol(args,&new_ast.ast_options.define_num.number,&t1,C_MAX,C_MIN)) {
-                    case 0:
-                        if(*t1 != '\0'){
-                            sprintf(new_ast.syntax_error,"extra argument'%s' for .define.",t1);
-                        }
-                    break;
-                    case -1:
-                        sprintf(new_ast.syntax_error,"number:'%s'  for define overflows",args);
-                    break;
-                    case -2:
-                        sprintf(new_ast.syntax_error,"arguments:'%s' for .define are invalid.",args);
-                    break;
+                t1 = strchr(args,'=');
+                if(t1) {
+                    *t1 = 0;
+                    if(is_valid_symbol(args,1,&t2) == 0 && *t2 == '\0') {
+                        new_ast.ast_options.define_num.define_symbol_name = args;
+                        t2 = strpbrk(args,SPACES);
+                        if(t2) * t2 = '\0';
+                    }else {
+                        sprintf(new_ast.syntax_error,"bad symbol:'%s'",args);
+                    }
+                    args = t1 +1;
+                    switch(my_strtol(args,&new_ast.ast_options.define_num.number,&t1,C_MAX,C_MIN)) {
+                        case 0:
+                            if(*t1 != '\0'){
+                                sprintf(new_ast.syntax_error,"extra argument'%s' for .define.",t1);
+                            }
+                        break;
+                        case -1:
+                            sprintf(new_ast.syntax_error,"number:'%s'  for define overflows",args);
+                        break;
+                        case -2:
+                            sprintf(new_ast.syntax_error,"arguments:'%s' for .define are invalid.",args);
+                        break;
+                    }
+                }else {
+
                 }
             }
         break;
