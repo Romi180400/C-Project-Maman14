@@ -101,7 +101,7 @@ char * pre_processor(const char *b_name) {
     as_file = fopen(as_name,"r");
     am_file = fopen(am_name,"w");
     if(! am_file || ! as_file) {
-        asm_prnt_err(as_name,line_counter   ,"could not open file: %s or file: %s .",as_name,am_name);
+        asm_prnt_err(as_name,line_counter,"could not open file: %s or file: %s .",as_name,am_name);
         free(am_name);
         free(as_name);
         return NULL;

@@ -17,6 +17,7 @@ static int assembler_second_pass(struct translation_unit * tu,FILE * am_file, co
     struct ast AST;
     int str_len;
     struct symbol * symbol_s, * symbol_s2;
+    struct external  * ext_f;
     int ok_flag =1;
     int line_counter = 1;
     int machine_code;
@@ -87,6 +88,16 @@ static int assembler_second_pass(struct translation_unit * tu,FILE * am_file, co
                                             machine_code = symbol_s->address << 2;
                                             if(symbol_s->symbol_type == symbol_external) {
                                                 machine_code |= 1;
+                                                ext_f = symbol_table_search_external(tu,symbol_s->name);
+                                                if(ext_f) {
+                                                    ext_f->addresses[ext_f->addr_count] = tu->code_section_size + PROG_BASE;
+                                                    ext_f->addr_count++;
+                                                }else {
+                                                    tu->external_arr[tu->external_arr_size].name = symbol_s->name;
+                                                    tu->external_arr[tu->external_arr_size].addresses[tu->external_arr[tu->external_arr_size].addr_count] = tu->code_section_size + PROG_BASE;
+                                                    tu->external_arr[tu->external_arr_size].addr_count++;
+                                                    tu->external_arr_size++;
+                                                }
                                             }else {
                                                 machine_code |= 2;
                                             }
@@ -95,6 +106,7 @@ static int assembler_second_pass(struct translation_unit * tu,FILE * am_file, co
                                 }else {
                                     ok_flag = 0;
                                     /* error , symbol : wast not found in symbol table*/
+                                    asm_prnt_err(am_file_name,line_counter,"undefined symbol:'%s'.",symbol_s->name);
                                 }
                             }
                             tu->code_section[tu->code_section_size] = machine_code;
@@ -107,12 +119,14 @@ static int assembler_second_pass(struct translation_unit * tu,FILE * am_file, co
 
                                 ok_flag =0;
                                 /* symbol X is not a data symbol and therefore cannot use array index*/
+                                asm_prnt_err(am_file_name,line_counter,"symbol:'%s' is not data , and therefore cannot be referenced using []",symbol_s->name);
                             }
                             tu->code_section[tu->code_section_size++] = (symbol_s->address << 2) | 2; 
                             if(AST.ast_options.ast_op.operands[i].operand.array_index.index_num_or_symbol == array_index_number) {
                                 if(AST.ast_options.ast_op.operands[i].operand.array_index.index <0 ||
                                     (AST.ast_options.ast_op.operands[i].operand.array_index.index >= symbol_s->data_or_str_size )) {
                                             /* symbol X with index Y is outside of bounds of this array/string*/
+                                            asm_prnt_err(am_file_name,line_counter,"symbol:'%s'. is used with index out of bounds: %d",symbol_s->name,AST.ast_options.ast_op.operands[i].operand.array_index.index );
                                     ok_flag =0;
                                 }else {
                                     tu->code_section[tu->code_section_size++] = AST.ast_options.ast_op.operands[i].operand.array_index.index << 2;
@@ -123,6 +137,7 @@ static int assembler_second_pass(struct translation_unit * tu,FILE * am_file, co
                                     if(symbol_s2->constant_number <0 ||
                                         (symbol_s2->constant_number >= symbol_s->data_or_str_size )) {
                                             /* symbol X with index Y is outside of bounds of this array/string*/
+                                            asm_prnt_err(am_file_name,line_counter,"symbol:'%s'. is used with index out of bounds: %d",symbol_s->name,symbol_s2->constant_number  );
                                         ok_flag =0;
                                     }
                                     else {
@@ -130,12 +145,15 @@ static int assembler_second_pass(struct translation_unit * tu,FILE * am_file, co
                                     }
                                 }else {
                                     ok_flag = 0;
-                                     /* error , symbol : wast not found in symbol table or the symbol was not defined as a const number*/                                   
+                                     /* error , symbol : wast not found in symbol table or the symbol was not defined as a const number*/  
+                                     asm_prnt_err(am_file_name,line_counter,"undefined symbol:'%s'.",symbol_s2->name);
+                                    
                                 }
                             }
                         }else {
                             ok_flag = 0;
                             /* error , symbol : wast not found in symbol table*/
+                            asm_prnt_err(am_file_name,line_counter,"undefined symbol:'%s'.",AST.ast_options.ast_op.operands[i].operand.array_index.symbol);
                         }
                     }
 
@@ -172,7 +190,7 @@ static int assembler_first_pass(struct translation_unit * tu,FILE * am_file, con
                     if(AST.ast_options.ast_dir.adt == dir_external ) {
                         ok_flag = 0;
                         /* remember to print error , this symbol is being declared as external but was already defined*/
-                        asm_prnt_err(am_file_name,line_counter,"symbol:'%s' was declared as external in line:'%s' symbol and now is being defined.",symbol_s->line_of_def);
+                        asm_prnt_err(am_file_name,line_counter,"symbol:'%s' was declared as external in line:'%d' symbol and now is being defined.",symbol_s->name,symbol_s->line_of_def);
                     }
                     else {
                         if(symbol_s->symbol_type == symbol_code) {
@@ -207,6 +225,11 @@ static int assembler_first_pass(struct translation_unit * tu,FILE * am_file, con
                             symbol_s->symbol_type = symbol_entry_data;
                             symbol_s->address = DC;
                             symbol_s->line_of_def = line_counter;
+                            if(AST.ast_options.ast_dir.adt == dir_string) {
+                                symbol_s->data_or_str_size = strlen(AST.ast_options.ast_dir.dir_option.string) + 1;
+                            }else {
+                                symbol_s->data_or_str_size = AST.ast_options.ast_dir.dir_option.data.data_count;
+                            }
                         }
                         else {
                             
@@ -219,7 +242,7 @@ static int assembler_first_pass(struct translation_unit * tu,FILE * am_file, con
                     if(AST.ast_type == ast_operation) {
                         symbol_table_insert(tu,AST.symbol,symbol_code,IC,line_counter,0,0);
                     }
-                    else {
+                    else if (AST.ast_type == ast_directive && AST.ast_options.ast_dir.adt > dir_external) {
                         if(AST.ast_options.ast_dir.adt == dir_string) {
                             symbol_table_insert(tu,AST.symbol,symbol_data,DC,line_counter,0,
                             strlen(AST.ast_options.ast_dir.dir_option.string) + 1);
@@ -256,6 +279,8 @@ static int assembler_first_pass(struct translation_unit * tu,FILE * am_file, con
                         IC+=2;
                     }
                 }
+            }else if(AST.ast_type == ast_const_def) {
+                symbol_table_insert(tu,AST.ast_options.define_num.define_symbol_name,symbol_const_number,0,line_counter,AST.ast_options.define_num.number,0);
             }
         }
         line_counter++;
@@ -268,6 +293,10 @@ static int assembler_first_pass(struct translation_unit * tu,FILE * am_file, con
         }
         if(tu->symbol_table[i].symbol_type == symbol_data || tu->symbol_table[i].symbol_type == symbol_entry_data) {
             tu->symbol_table[i].address += IC;
+        }
+        if(tu->symbol_table[i].symbol_type == symbol_entry_data ||tu->symbol_table[i].symbol_type == symbol_entry_code) {
+            tu->entries[tu->entries_count] = &tu->symbol_table[i];
+            tu->entries_count++; 
         }
     }
     return ok_flag;
@@ -294,7 +323,9 @@ int main(int argc, char ** argv) {
                         back_main(&tu_for_each,argv[i]);
                     }
                 }
+                fclose(am_FILE);
             }
+            free(am_file_name);
         }
     }
     return 0;

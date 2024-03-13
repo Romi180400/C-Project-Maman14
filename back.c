@@ -16,22 +16,22 @@ static void back_print_ext( const struct external *externals, const int external
     if(ext_file) {
      for(i=0;i<externals_size;i++) {
         for(j=0;j<externals[i].addr_count;j++) {
-            printf("%s\t%d\n",externals[i].name,externals[i].addresses[j]);
+            fprintf(ext_file,"%s\t%d\n",externals[i].name,externals[i].addresses[j]);
         }
     }
     fclose(ext_file);      
     }
     free(ext_f_name);
 }
-static void back_print_ent(const struct symbol * entries, const int entries_size,const char *b_name) {
+static void back_print_ent(const struct symbol * const entries[], const int entries_size,const char *b_name) {
     char *ent_f_name;
     FILE *ent_file;
     int i;
-    ent_f_name = m_strcat(b_name,".ext");
+    ent_f_name = m_strcat(b_name,".ent");
     ent_file = fopen(ent_f_name,"w");
     if(ent_file) {
         for(i=0;i<entries_size;i++) {
-            printf("%s\t%d\n",entries[i].name,entries[i].address);
+            fprintf(ent_file,"%s\t%d\n",entries[i]->name,entries[i]->address);
         }
         fclose(ent_file);
     }
@@ -48,11 +48,11 @@ static void back_print_ob(const int *code_section,
     ob_file = fopen(ob_file_name,"w");
     if(ob_file) {
         for(i=0;i<code_section_size;i++) {
-            printf(OUT_PRNT_STR "\n",OUT_PRNT_BITS(code_section[i]));
+            fprintf(ob_file,OUT_PRNT_STR "\n",OUT_PRNT_BITS(code_section[i]));
         }
 
         for(i=0;i<data_section_size;i++) {
-            printf(OUT_PRNT_STR "\n",OUT_PRNT_BITS(data_section[i]));
+            fprintf(ob_file,OUT_PRNT_STR "\n",OUT_PRNT_BITS(data_section[i]));
 
         }
     fclose(ob_file);
@@ -61,7 +61,7 @@ static void back_print_ob(const int *code_section,
 }
 void back_main(const struct translation_unit *tu,const char *b_name) {
     if(tu->entries_count >0) {
-        back_print_ent((const struct symbol *)tu->entries,tu->entries_count,b_name);
+        back_print_ent(tu->entries,tu->entries_count,b_name);
     }
     if(tu->external_arr_size >0) {
         back_print_ext(tu->external_arr,tu->external_arr_size,b_name);

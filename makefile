@@ -1,4 +1,4 @@
-CFLAGS = -ansi -g -pedantic -Wall -Wextra
+CFLAGS = -ansi -g -pedantic -Wall -Wextra -fsanitize=address
 
 assembler:lexer.o assembler.o back.o translation_unit.o utils.o preproc.o
 	gcc $(CFLAGS) $^ -o $@

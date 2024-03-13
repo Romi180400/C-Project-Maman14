@@ -204,6 +204,7 @@ static struct parse_args_result parse_args(char * args_string,const char * args_
     d = is_valid_symbol(args_string,1,&t1);
     if( d == 0 || ( d !=0 && *t1 == '[')) {
         if(*t1 == '[') {
+            *t1 = '\0';
             t1++;
             after_sppace(t1);
             t2 = strchr(t1,']');
@@ -213,16 +214,16 @@ static struct parse_args_result parse_args(char * args_string,const char * args_
                     if(par2.arg_syntax_error[0] != '\0') {
                         strcpy(par.arg_syntax_error,par2.arg_syntax_error);
                     }else {
+                            par.type = arg_array_index;
+                            par.result.array_index.symbol = args_string;
                         switch(par2.type) {
                             case arg_symbol:
-                                par.type = arg_array_index;
-                                par.result.array_index.symbol = args_string;
-                                par.result.array_index.index = par2.result.number;
+                                par.result.array_index.index_symbol = par2.result.symbol;
+                                par.result.array_index.index_num_or_symbol = array_index_label;
                             break;
                             case arg_number:
-                                par.type = arg_array_index;
-                                par.result.array_index.symbol = args_string;
-                                par.result.array_index.index_symbol = par2.result.symbol;
+                                par.result.array_index.index = par2.result.number;
+                                par.result.array_index.index_num_or_symbol = array_index_number;
                             break;
                             default:
                                 sprintf(par.arg_syntax_error,"undefined or unsupported arg inside brackets:'%s'",t1);
@@ -263,12 +264,15 @@ static void parse_asm_arg(struct parse_args_result * par,int src_or_dest, struct
             ast->ast_options.ast_op.operands[src_or_dest].operand.array_index.symbol = par->result.array_index.symbol;
             if(par->result.array_index.index_num_or_symbol == array_index_label) {
                 ast->ast_options.ast_op.operands[src_or_dest].operand.array_index.index_symbol = par->result.array_index.index_symbol;
+                ast->ast_options.ast_op.operands[src_or_dest].operand.array_index.index_num_or_symbol = array_index_label;
             }else {
                 ast->ast_options.ast_op.operands[src_or_dest].operand.array_index.index = par->result.array_index.index;
+                ast->ast_options.ast_op.operands[src_or_dest].operand.array_index.index_num_or_symbol = array_index_number;
             }
             break;
         case arg_symbol:
             ast->ast_options.ast_op.operands[src_or_dest].operand.symbol = par->result.symbol;
+            ast->ast_options.ast_op.operands[src_or_dest].operand_option = operand_symbol;
             break;
         case arg_register:
             ast->ast_options.ast_op.operands[src_or_dest].operand_option = operand_register;

@@ -20,3 +20,13 @@ void symbol_table_insert(struct translation_unit * tu, const char *candidate,
     tu->symbol_table[tu->symbol_table_size].data_or_str_size = data_or_str_size;
     tu->symbol_table_size++;
 }
+struct external * symbol_table_search_external(struct translation_unit * tu,const char * candidate) {
+int i;
+for(i=0; i < tu->external_arr_size;i++) {
+    if(strcmp(candidate,tu->external_arr[i].name) == 0) {
+        return &tu->external_arr[i];
+    }
+}
+return NULL;
+
+}

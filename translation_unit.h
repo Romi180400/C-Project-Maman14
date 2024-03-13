@@ -47,4 +47,7 @@ void symbol_table_insert(struct translation_unit * tu, const char *candidate,
                         enum symbol_type symbol_type,
                         int address,int line_of_def,int c_number,int data_or_str_size);
 
+
+
+struct external * symbol_table_search_external(struct translation_unit * tu,const char * candidate);
 #endif
