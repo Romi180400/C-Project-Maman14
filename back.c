@@ -43,15 +43,18 @@ static void back_print_ob(const int *code_section,
     int i;
     FILE * ob_file;
     char * ob_file_name;
-
+    int addr = 100;
     ob_file_name = m_strcat(b_name,".ob");
     ob_file = fopen(ob_file_name,"w");
     if(ob_file) {
-        for(i=0;i<code_section_size;i++) {
+        fprintf(ob_file,"  %d %d\n",code_section_size,data_section_size);
+        for(i=0;i<code_section_size;i++,addr++) {
+            fprintf(ob_file,"%04d ",addr);
             fprintf(ob_file,OUT_PRNT_STR "\n",OUT_PRNT_BITS(code_section[i]));
         }
 
-        for(i=0;i<data_section_size;i++) {
+        for(i=0;i<data_section_size;i++,addr++) {
+            fprintf(ob_file,"%04d ",addr);
             fprintf(ob_file,OUT_PRNT_STR "\n",OUT_PRNT_BITS(data_section[i]));
 
         }

@@ -42,10 +42,10 @@ struct ast {
             enum asm_op_type aot;
             struct {
                 enum {
-                    operand_none = 0,
-                    operand_immd = 0,
+                    operand_none = -2,
+                    operand_immd = -1,
                     operand_immd_symbol =0,
-                    operand_symbol,
+                    operand_symbol =1,
                     operand_array_index,
                     operand_register
                 }operand_option;

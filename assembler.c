@@ -49,13 +49,15 @@ static int assembler_second_pass(struct translation_unit * tu,FILE * am_file, co
             }
         }else if(AST.ast_type == ast_operation) {
             machine_code = AST.ast_options.ast_op.aot << 6;
-            machine_code |= AST.ast_options.ast_op.operands[0].operand_option << 4;
-            machine_code |= AST.ast_options.ast_op.operands[1].operand_option << 2;
+            if(AST.ast_options.ast_op.operands[0].operand_option > operand_immd_symbol)
+                machine_code |= AST.ast_options.ast_op.operands[0].operand_option << 4;
+            if(AST.ast_options.ast_op.operands[1].operand_option >  operand_immd_symbol)
+                machine_code |= AST.ast_options.ast_op.operands[1].operand_option << 2;
             tu->code_section[tu->code_section_size] = machine_code;
             tu->code_section_size++;
             if(AST.ast_options.ast_op.operands[0].operand_option == operand_register &&
                  AST.ast_options.ast_op.operands[1].operand_option == operand_register ) {
-                            machine_code = AST.ast_options.ast_op.operands[1].operand.reg << 3;
+                            machine_code = AST.ast_options.ast_op.operands[1].operand.reg << 2;
                             machine_code |= AST.ast_options.ast_op.operands[0].operand.reg << 5;
                             tu->code_section[tu->code_section_size] = machine_code;
                             tu->code_section_size++;
@@ -70,19 +72,30 @@ static int assembler_second_pass(struct translation_unit * tu,FILE * am_file, co
                                 machine_code = AST.ast_options.ast_op.operands[i].operand.reg << (5 - (i * 3));
                             }else if(AST.ast_options.ast_op.operands[i].operand_option == operand_immd) {
                                 machine_code = AST.ast_options.ast_op.operands[i].operand.immd << 2;
-                            }else {
+                            }else if(AST.ast_options.ast_op.operands[i].operand_option == operand_immd_symbol) {
+                                symbol_s = symbol_table_search(tu,AST.ast_options.ast_op.operands[i].operand.symbol);
+                                if(symbol_s) {
+                                    machine_code = symbol_s->constant_number << 2;
+                                }else {
+                                    ok_flag =0;
+                                    asm_prnt_err(am_file_name,line_counter,"undefined symbol:'%s'",AST.ast_options.ast_op.operands[i].operand.symbol);
+                                }
+                            }
+                            else {
                                 symbol_s = symbol_table_search(tu,AST.ast_options.ast_op.operands[i].operand.symbol);
                                 if(symbol_s) {
                                     if(AST.ast_options.ast_op.operands[i].operand_option == operand_immd_symbol) {
                                         if(symbol_s->symbol_type != symbol_const_number) {
                                             ok_flag = 0;
                                             /* error , symbol:... expected to be constant number symbol*/
+                                            asm_prnt_err(am_file_name,line_counter,"symbol:'%s' defined at line %d must be refernce to a constant number.",symbol_s->name,symbol_s->line_of_def);
                                         }else {
                                             machine_code = symbol_s->constant_number << 2;
                                         }
                                     }else {
                                         if(symbol_s->symbol_type == symbol_const_number) {
                                             ok_flag = 0;
+                                            asm_prnt_err(am_file_name,line_counter,"symbol:'%s' defined at line %d cannot be constant number",symbol_s->name,symbol_s->line_of_def);
                                             /* error  symbol.... expected not to be a symbol immed*/
                                         }else {
                                             machine_code = symbol_s->address << 2;
@@ -105,7 +118,7 @@ static int assembler_second_pass(struct translation_unit * tu,FILE * am_file, co
                                     }
                                 }else {
                                     ok_flag = 0;
-                                    /* error , symbol : wast not found in symbol table*/
+                                    /* error , symbol : was not found in symbol table*/
                                     asm_prnt_err(am_file_name,line_counter,"undefined symbol:'%s'.",symbol_s->name);
                                 }
                             }
@@ -259,25 +272,24 @@ static int assembler_first_pass(struct translation_unit * tu,FILE * am_file, con
                 if(AST.ast_options.ast_dir.adt == dir_data) {
                     DC += AST.ast_options.ast_dir.dir_option.data.data_count;
                 }else {
-                for(i=0;i<tu->symbol_table_size;i++) {
-                    if(tu->symbol_table[i].symbol_type == symbol_data || tu->symbol_table[i].symbol_type == symbol_entry_data) {
-                        tu->symbol_table[i].address += IC;
-                    }
-            } DC += strlen(AST.ast_options.ast_dir.dir_option.string) + 1;
+                     DC += strlen(AST.ast_options.ast_dir.dir_option.string) + 1;
                 }
             }else if(AST.ast_type == ast_operation) {
                 IC++;
                 if(AST.ast_options.ast_op.operands[0].operand_option == operand_register &&
                  AST.ast_options.ast_op.operands[1].operand_option == operand_register ) {
                     IC++;
-                }
+                }else { 
                 for(i=0;i<2;i++) {
+                    if(AST.ast_options.ast_op.operands[i].operand_option == operand_none)
+                        continue;
                     if(AST.ast_options.ast_op.operands[i].operand_option >= operand_immd && AST.ast_options.ast_op.operands[i].operand_option!= operand_array_index ) {
                         IC++;
                     }
-                    else {
+                    else  {
                         IC+=2;
                     }
+                }
                 }
             }else if(AST.ast_type == ast_const_def) {
                 symbol_table_insert(tu,AST.ast_options.define_num.define_symbol_name,symbol_const_number,0,line_counter,AST.ast_options.define_num.number,0);

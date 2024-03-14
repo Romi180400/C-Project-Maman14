@@ -170,6 +170,11 @@ static struct parse_args_result parse_args(char * args_string,const char * args_
         /* maybe its symbol now, or another constant number*/
         if(is_valid_symbol(args_string,1,&t1) == 0) {
             par.type = arg_immed_symbol;
+            if(*t1 != '\0')
+                sprintf(par.arg_syntax_error,"extra text after:'%s' ",args_string);
+            t1 = strpbrk(args_string,SPACES);
+            if(t1) *t1 = '\0';
+            par.result.symbol = args_string;
             return par;
         }else {
             if(my_strtol(args_string,&par.result.immed,&t1,C_MAX,C_MIN) == 0) {
@@ -480,6 +485,7 @@ struct ast lexer_get_ast(char * line) {
     struct ast new_ast = {0};
     char * args;
     char * t1,*t2;
+    new_ast.ast_options.ast_op.operands[0].operand_option = new_ast.ast_options.ast_op.operands[1].operand_option = operand_none;
     /* algo goes here...*/
     line[strcspn(line, "\r\n")] = 0;
     after_sppace(line);
