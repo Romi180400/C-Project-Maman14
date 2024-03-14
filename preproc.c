@@ -36,36 +36,34 @@ static struct macro * search_macro(const struct macro_table * m_table,const char
 }
 static enum preproc_line_type preproc_get_line_type(char *line,struct macro_table * mcr_table,struct macro **macro_ptr) {
     char line_copy[82] = {0};
-    char *t1,*t2;
+    char *t1 = NULL,*t2 = NULL;
     after_sppace(line);
     strcpy(line_copy,line);
     line = line_copy;
     line[strcspn(line, "\r\n")] = 0;
     if(*line == '\0')
         return preproc_null_line;
-    t1 = strstr(line,"endmcr");
-    if(t1) {
+    if(strncmp(line,"endmcr",strlen("endmcr")) == 0)
         return macro_end_def;
-    }
-    t1 = strstr(line,"mcr");
-    if(t1) {
-        t1+=3;
-        after_sppace(t1);
-        if(*t1 =='\0') {
+    if(strncmp(line,"mcr",strlen("mcr")) == 0) {
+        line+=3;
+        after_sppace(line);
+        if(*line =='\0') {
             return macro_def_err_missing_name;
         }
         t2 = strpbrk(line,SPACES);
         if(t2) {
             *t2 =0;
         }
-        *macro_ptr = search_macro(mcr_table,t1);
+        *macro_ptr = search_macro(mcr_table,line);
         if(*macro_ptr) {
             return macro_redef_err;
         }
         else {
-            strcpy(mcr_table->macros[mcr_table->macro_count].name,t1);
+            strcpy(mcr_table->macros[mcr_table->macro_count].name,line);
             *macro_ptr = &mcr_table->macros[mcr_table->macro_count];
             mcr_table->macro_count++;
+            return macro_def;
         }
     }
     t2 = t1 = strpbrk(line,SPACES);
@@ -133,7 +131,7 @@ char * pre_processor(const char *b_name) {
                 macro_ptr = NULL;
             break;
             case macro_call:
-                for(i=0;i>macro_ptr->line_c;i++) {
+                for(i=0;i<macro_ptr->line_c;i++) {
                     fputs(macro_ptr->lines[i],am_file);
                 }
                 macro_ptr = NULL;

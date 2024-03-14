@@ -28,8 +28,9 @@ static int assembler_second_pass(struct translation_unit * tu,FILE * am_file, co
         if(AST.ast_type == ast_directive && AST.ast_options.ast_dir.adt > dir_external) {
             if(AST.ast_options.ast_dir.adt == dir_string) {
                 str_len = strlen(AST.ast_options.ast_dir.dir_option.string);
-                memcpy(&tu->data_section[tu->data_section_size],AST.ast_options.ast_dir.dir_option.string,str_len);
-                tu->data_section_size += str_len +1;
+                for(i =0 ;i<= str_len;i++,tu->data_section_size++) {
+                    tu->data_section[tu->data_section_size] = AST.ast_options.ast_dir.dir_option.string[i];
+                }
             }else {
                 for(i=0;i<AST.ast_options.ast_dir.dir_option.data.data_count;i++) {
                     if(AST.ast_options.ast_dir.dir_option.data.data_type[i] == data_define_symbol) {
