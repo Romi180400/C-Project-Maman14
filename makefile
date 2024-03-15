@@ -1,4 +1,4 @@
-CFLAGS = -ansi -g -pedantic -Wall -Wextra -fsanitize=address
+CFLAGS = -ansi -pedantic -Wall -Wextra 
 
 assembler:lexer.o assembler.o back.o translation_unit.o utils.o preproc.o
 	gcc $(CFLAGS) $^ -o $@
@@ -31,4 +31,4 @@ clean:
 	rm -f tests/*.ob tests/*.ent tests/*.ext tests/*.am
 
 zip: clean
-	zip -r mmn14.zip *
+	zip -r final_project.zip *
